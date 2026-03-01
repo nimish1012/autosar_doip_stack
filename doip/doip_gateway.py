@@ -64,6 +64,8 @@ class DoIPGateway:
                         conn.close()
                         writer.close()
                         del self.active_connections[addr]
+                    else:
+                        conn.check_session_timeout()
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -124,7 +126,7 @@ class DoIPGateway:
                     logger.info(f"Received Diagnostic Message: SA=0x{source_addr:04X} TA=0x{target_addr:04X}")
                     
                     diag_req = DiagnosticRequest(source_address=source_addr, target_address=target_addr, uds_payload=uds_payload)
-                    diag_resp = self.diagnostic_manager.handle_diagnostic_message(diag_req)
+                    diag_resp = self.diagnostic_manager.handle_diagnostic_message(diag_req, conn)
                     
                     if diag_resp and diag_resp.uds_payload:
                         resp_payload = struct.pack("!HH", diag_resp.source_address, diag_resp.target_address) + diag_resp.uds_payload

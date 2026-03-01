@@ -11,6 +11,12 @@ class NRC(IntEnum):
     REQUEST_OUT_OF_RANGE = 0x31
     SECURITY_DENIED = 0x33
 
+class DiagnosticSession(IntEnum):
+    """Supported UDS Diagnostic Sessions (Service 0x10)."""
+    DEFAULT = 0x01
+    PROGRAMMING = 0x02
+    EXTENDED = 0x03
+
 class NegativeResponse:
     """Format and generate a UDS Negative Response payload (0x7F)."""
     

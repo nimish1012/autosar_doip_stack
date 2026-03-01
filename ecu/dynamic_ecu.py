@@ -28,23 +28,8 @@ class DynamicECU(BaseECU):
             logger.warning(f"{self.name} (0x{self.logical_address:04X}) rejected unsupported Service 0x{sid:02X}")
             return NegativeResponse(sid, NRC.SERVICE_NOT_SUPPORTED).encode()
             
-        # 1. 0x10 Diagnostic Session Control
-        if sid == 0x10:
-            if len(uds_payload) != 2:
-                return NegativeResponse(sid, NRC.INVALID_LENGTH).encode()
-                
-            sub_function = uds_payload[1]
-            session_map = {0x01: "DEFAULT", 0x02: "PROGRAMMING", 0x03: "EXTENDED"}
-            
-            if sub_function in session_map:
-                self.state["session"] = session_map[sub_function]
-                logger.info(f"{self.name} (0x{self.logical_address:04X}) entered session: {self.state['session']}")
-                return bytes([sid + 0x40, sub_function, 0x00, 0x32, 0x01, 0xF4])
-            else:
-                return NegativeResponse(sid, NRC.SUB_FUNCTION_NOT_SUPPORTED).encode()
-                
-        # 2. 0x11 ECU Reset
-        elif sid == 0x11:
+        # 1. 0x11 ECU Reset
+        if sid == 0x11:
             if len(uds_payload) != 2:
                 return NegativeResponse(sid, NRC.INVALID_LENGTH).encode()
                 
@@ -56,7 +41,7 @@ class DynamicECU(BaseECU):
             else:
                 return NegativeResponse(sid, NRC.SUB_FUNCTION_NOT_SUPPORTED).encode()
                 
-        # 3. 0x22 Read Data By Identifier
+        # 2. 0x22 Read Data By Identifier
         elif sid == 0x22:
             if len(uds_payload) != 3:
                 return NegativeResponse(sid, NRC.INVALID_LENGTH).encode()

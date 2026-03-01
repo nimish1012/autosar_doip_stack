@@ -1,0 +1,2 @@
+# No external dependencies are currently required for the base interfaces.
+# Add third-party packages here as the implementation grows.

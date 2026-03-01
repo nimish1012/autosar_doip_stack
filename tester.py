@@ -3,6 +3,7 @@ import argparse
 import struct
 import sys
 from doip.messages import DoIPHeader, PayloadType
+from diagnostic.diagnostic_messages import NRC
 
 class TesterLogger:
     @staticmethod
@@ -24,6 +25,10 @@ class TesterLogger:
     @staticmethod
     def error(msg):
         print(f"[\033[91mERR\033[0m]  {msg}")
+
+    @staticmethod
+    def nrc(msg):
+        print(f"[\033[95mNRC\033[0m]   {msg}")
 
 async def udp_discovery(ip):
     TesterLogger.step(f"Performing UDP vehicle discovery on {ip}:13400...")
@@ -131,7 +136,17 @@ async def send_uds(writer, reader, sa, ta, uds_payload, desc="UDS"):
         if resp_header.payload_type == PayloadType.DIAGNOSTIC_MESSAGE:
             resp_payload = await asyncio.wait_for(reader.readexactly(resp_header.payload_length), timeout=2.0)
             uds_resp = resp_payload[4:] # Skip SA and TA
-            TesterLogger.recv(f"Diagnostic Message, UDS Response: {uds_resp.hex().upper()}")
+            
+            if uds_resp[0] == 0x7F:
+                req_sid, nrc_val = uds_resp[1], uds_resp[2]
+                try:
+                    nrc_name = NRC(nrc_val).name
+                except ValueError:
+                    nrc_name = "UNKNOWN_NRC"
+                TesterLogger.nrc(f"Negative Response (0x7F): request_sid=0x{req_sid:02X}, NRC=0x{nrc_val:02X} ({nrc_name})")
+            else:
+                TesterLogger.recv(f"Diagnostic Message, UDS Positive Response: {uds_resp.hex().upper()}")
+                
             return uds_resp
         else:
              if resp_header.payload_length > 0:
@@ -150,6 +165,11 @@ async def main():
     parser.add_argument("--session", type=lambda x: int(x, 16), help="Start diagnostic session (e.g. 01 for Default, 03 for Extended)")
     parser.add_argument("--read-vin", action="store_true", help="Read VIN (Service 0x22, DID 0xF190)")
     parser.add_argument("--reset", type=lambda x: int(x, 16), help="ECU Reset (e.g. 01 for Hard Reset, 03 for Soft)")
+    
+    # Negative Testing Helpers
+    parser.add_argument("--test-nrc-11", action="store_true", help="Send an unknown SID (0x44) to trigger NRC 0x11")
+    parser.add_argument("--test-nrc-13", action="store_true", help="Send a truncated Session Control Request to trigger NRC 0x13")
+    parser.add_argument("--test-nrc-31", action="store_true", help="Send requested DID reading unknown value to trigger NRC 0x31")
 
     args = parser.parse_args()
 
@@ -162,20 +182,38 @@ async def main():
         return
 
     try:
-        # 4. UDS Requests
+        has_tests = False
+        
+        # 4. Standard UDS Requests
         if args.session is not None:
+            has_tests = True
             await send_uds(writer, reader, args.tester_addr, args.target_ecu, bytes([0x10, args.session]), desc=f"Diagnostic Session Control (0x{args.session:02X})")
             
         if args.read_vin:
+            has_tests = True
             resp = await send_uds(writer, reader, args.tester_addr, args.target_ecu, b'\x22\xF1\x90', desc="Read VIN (0x22 0xF190)")
             if resp and resp[0] == 0x62 and resp[1:3] == b'\xF1\x90':
                 vin = resp[3:].decode('ascii', errors='replace')
                 TesterLogger.info(f"Decoded VIN: {vin}")
                 
         if args.reset is not None:
+            has_tests = True
             await send_uds(writer, reader, args.tester_addr, args.target_ecu, bytes([0x11, args.reset]), desc=f"ECU Reset (0x{args.reset:02X})")
             
-        if not any([args.session is not None, args.read_vin, args.reset is not None]):
+        # 5. Negative NRC Validation Requests
+        if args.test_nrc_11:
+            has_tests = True
+            await send_uds(writer, reader, args.tester_addr, args.target_ecu, bytes([0x44]), desc="Unknown SID Test (0x44)")
+            
+        if args.test_nrc_13:
+            has_tests = True
+            await send_uds(writer, reader, args.tester_addr, args.target_ecu, bytes([0x10]), desc="Truncated Session Control Request")
+            
+        if args.test_nrc_31:
+            has_tests = True
+            await send_uds(writer, reader, args.tester_addr, args.target_ecu, bytes([0x22, 0xF1, 0x99]), desc="Unknown DID Read Request (0x22 0xF199)")
+            
+        if not has_tests:
             TesterLogger.info("No UDS actions requested. Closing connection.")
 
     finally:

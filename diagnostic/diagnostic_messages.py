@@ -1,4 +1,25 @@
 from dataclasses import dataclass
+from enum import IntEnum
+
+class NRC(IntEnum):
+    """Negative Response Codes representing standard ISO 14229-1 UDS failures."""
+    GENERAL_REJECT = 0x10
+    SERVICE_NOT_SUPPORTED = 0x11
+    SUB_FUNCTION_NOT_SUPPORTED = 0x12
+    INVALID_LENGTH = 0x13
+    CONDITIONS_NOT_CORRECT = 0x22
+    REQUEST_OUT_OF_RANGE = 0x31
+    SECURITY_DENIED = 0x33
+
+class NegativeResponse:
+    """Format and generate a UDS Negative Response payload (0x7F)."""
+    
+    def __init__(self, request_sid: int, nrc: NRC):
+        self.request_sid = request_sid
+        self.nrc = nrc
+        
+    def encode(self) -> bytes:
+        return bytes([0x7F, self.request_sid, self.nrc.value])
 
 @dataclass
 class DiagnosticRequest:

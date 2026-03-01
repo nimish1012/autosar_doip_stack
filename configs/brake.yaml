@@ -1,0 +1,9 @@
+name: "BrakeECU"
+logical_address: 0x0E01
+vin: "WVWZZZBRK00A00002"
+supported_services:
+  - 0x10 # Diagnostic Session Control
+  - 0x11 # ECU Reset
+  - 0x22 # Read Data By Identifier
+data_identifiers:
+  0xF190: "VIN"

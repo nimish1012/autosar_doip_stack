@@ -2,8 +2,10 @@ name: "EngineECU"
 logical_address: 0x0E00
 vin: "WVWZZZENG00A00001"
 supported_services:
-  - 0x10 # Diagnostic Session Control
-  - 0x11 # ECU Reset
-  - 0x22 # Read Data By Identifier
+  0x10: [1, 2, 3] # Diagnostic Session Control
+  0x11:
+    sessions: [2, 3]    # ECU Reset requires elevated session
+    requires_security: true
+  0x22: [1, 2, 3] # Read Data By Identifier
 data_identifiers:
   0xF190: "VIN"

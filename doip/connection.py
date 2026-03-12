@@ -20,7 +20,7 @@ class InvalidTransitionError(Exception):
 class DoIPConnection:
     """Manages the state and timeout of a single DoIP TCP connection."""
     
-    def __init__(self, addr, timeout_seconds=30.0, session_timeout_seconds=5.0):
+    def __init__(self, addr, timeout_seconds=30.0, session_timeout_seconds=5.0, security_timeout_seconds=30.0):
         self.addr = addr
         self.state = DoIPConnectionState.TCP_CONNECTED
         self.last_activity = time.time()
@@ -31,6 +31,12 @@ class DoIPConnection:
         self.session_last_activity = time.time()
         self.session_timeout_seconds = session_timeout_seconds
         
+        # Security Access
+        self.unlock_security = False
+        self.active_seed = None
+        self.security_last_activity = None  # Set only when security is actually unlocked
+        self.security_timeout_seconds = security_timeout_seconds
+        
         logger.info(f"[{addr}] Connection established. State: {self.state.value}, Session: {self.current_session.name}")
 
     def update_activity(self):
@@ -38,8 +44,11 @@ class DoIPConnection:
         self.last_activity = time.time()
         
     def update_session_activity(self):
-        """Reset the timer tracking the demotion back to the DEFAULT session."""
-        self.session_last_activity = time.time()
+        """Reset the session and security inactivity timers on each diagnostic request."""
+        now = time.time()
+        self.session_last_activity = now
+        if self.unlock_security:
+            self.security_last_activity = now
         
     def set_session(self, session: DiagnosticSession):
         """Elevate or demote the active diagnostic session tracking state."""
@@ -67,6 +76,31 @@ class DoIPConnection:
         elapsed = time.time() - self.session_last_activity
         if elapsed > self.session_timeout_seconds:
             logger.warning(f"[{self.addr}] Session timed out after {elapsed:.1f}s. Reverting to {DiagnosticSession.DEFAULT.name}.")
+            self.set_session(DiagnosticSession.DEFAULT)
+            return True
+        return False
+
+    def check_security_timeout(self) -> bool:
+        """Check if security unlock has expired due to inactivity.
+        
+        Per requirements, on expiry:
+        - unlock_security is set to False
+        - session is reverted to DEFAULT
+        """
+        if not self.unlock_security or self.security_last_activity is None or self.state == DoIPConnectionState.CLOSED:
+            return False
+            
+        elapsed = time.time() - self.security_last_activity
+        if elapsed > self.security_timeout_seconds:
+            logger.warning(
+                f"[{self.addr}] Security access timed out after {elapsed:.1f}s. "
+                f"Locking security and reverting session to {DiagnosticSession.DEFAULT.name}."
+            )
+            # Lock security BEFORE calling set_session to prevent update_session_activity
+            # from inadvertently refreshing security_last_activity while still unlocked.
+            self.unlock_security = False
+            self.active_seed = None
+            self.security_last_activity = None
             self.set_session(DiagnosticSession.DEFAULT)
             return True
         return False

@@ -16,7 +16,6 @@ class BaseECU(ABC):
     def __init__(self, logical_address: int):
         self.logical_address = logical_address
         self.state = {
-            "session": "DEFAULT",  # default, extended, programming
             "reset_pending": False
         }
 
@@ -50,6 +49,21 @@ class BaseECU(ABC):
         Handle the raw UDS payload and return the response payload.
         To be implemented by concrete ECU instances.
         """
+        pass
+
+    @abstractmethod
+    def is_service_supported(self, sid: int) -> bool:
+        """Check if the provided Service ID exists explicitly on this ECU."""
+        pass
+
+    @abstractmethod
+    def is_service_supported_in_session(self, sid: int, session_id: int) -> bool:
+        """Check if the provided session has permission to run the service."""
+        pass
+
+    @abstractmethod
+    def is_service_security_required(self, sid: int) -> bool:
+        """Check if the service requires security access."""
         pass
 
     def initialize(self) -> None:

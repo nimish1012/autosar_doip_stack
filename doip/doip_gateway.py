@@ -1,6 +1,5 @@
 import asyncio
 import struct
-import time
 from common.logger import setup_logger
 from network.udp_server import AsyncUDPServer
 from network.tcp_server import AsyncTCPServer
@@ -66,6 +65,7 @@ class DoIPGateway:
                         del self.active_connections[addr]
                     else:
                         conn.check_session_timeout()
+                        conn.check_security_timeout()
             except asyncio.CancelledError:
                 break
             except Exception as e:

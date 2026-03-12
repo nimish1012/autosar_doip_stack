@@ -64,8 +64,19 @@ def validate_ecu_config(config: dict, source: str):
     if not isinstance(config['vin'], str) or len(config['vin']) != 17:
         raise InvalidConfigurationError("'vin' must be exactly a 17 character string.")
         
-    if not isinstance(config['supported_services'], list):
-        raise InvalidConfigurationError("'supported_services' must be a list of integers.")
+    if not isinstance(config['supported_services'], dict):
+        raise InvalidConfigurationError("'supported_services' must be a dictionary mapping SID to allowed sessions.")
+        
+    for sid, sessions in config['supported_services'].items():
+        if not isinstance(sid, int):
+            raise InvalidConfigurationError(f"SID keys in 'supported_services' must be integers. Found: {sid}")
+        if not isinstance(sessions, (list, dict)):
+            raise InvalidConfigurationError(f"Session mappings for SID 0x{sid:02X} must be a list or dictionary.")
+        
+        session_list = sessions if isinstance(sessions, list) else sessions.get('sessions', [])
+        for s in session_list:
+            if not isinstance(s, int):
+                raise InvalidConfigurationError(f"Session value for SID 0x{sid:02X} contains non-integer session ID.")
         
     if not isinstance(config['data_identifiers'], dict):
         raise InvalidConfigurationError("'data_identifiers' must be a dictionary.")

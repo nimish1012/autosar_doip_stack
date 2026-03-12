@@ -17,17 +17,31 @@ class DynamicECU(BaseECU):
         self.config = config
         self.name = config["name"]
         self.vin = config["vin"].encode('ascii', errors='replace')
-        self.supported_services = config["supported_services"]
+        self.supported_services = dict(config["supported_services"])  # Shallow copy to avoid mutating original config
+        for sid, details in self.supported_services.items():
+            if isinstance(details, list):
+                self.supported_services[sid] = {"sessions": details, "requires_security": False}
+            elif isinstance(details, dict):
+                self.supported_services[sid] = {
+                    "sessions": details.get("sessions", []),
+                    "requires_security": details.get("requires_security", False)
+                }
         self.data_identifiers = config["data_identifiers"]
+        
+    def is_service_supported(self, sid: int) -> bool:
+        return sid in self.supported_services
+
+    def is_service_supported_in_session(self, sid: int, session_id: int) -> bool:
+        return self.is_service_supported(sid) and (session_id in self.supported_services[sid]["sessions"])
+
+    def is_service_security_required(self, sid: int) -> bool:
+        if self.is_service_supported(sid):
+            return self.supported_services[sid]["requires_security"]
+        return False
         
     def handle_request(self, uds_payload: bytes) -> bytes:
         sid = uds_payload[0]
         
-        # 0. Check if SID is supported by the configuration
-        if sid not in self.supported_services:
-            logger.warning(f"{self.name} (0x{self.logical_address:04X}) rejected unsupported Service 0x{sid:02X}")
-            return NegativeResponse(sid, NRC.SERVICE_NOT_SUPPORTED).encode()
-            
         # 1. 0x11 ECU Reset
         if sid == 0x11:
             if len(uds_payload) != 2:

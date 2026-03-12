@@ -10,6 +10,8 @@ class NRC(IntEnum):
     CONDITIONS_NOT_CORRECT = 0x22
     REQUEST_OUT_OF_RANGE = 0x31
     SECURITY_DENIED = 0x33
+    INVALID_KEY = 0x35
+    SUB_FUNCTION_NOT_SUPPORTED_IN_ACTIVE_SESSION = 0x7E
 
 class DiagnosticSession(IntEnum):
     """Supported UDS Diagnostic Sessions (Service 0x10)."""
